@@ -33,7 +33,7 @@ spy_data = yf.download('SPY', start=start_date, end=end_date)
 spy_data['Daily_Return'] = spy_data['Close'].pct_change()
 spy_data['Cumulative_Return'] = (1 + spy_data['Daily_Return']).cumprod()
 
-# lot both cumulative returns on the same chart
+# plot both cumulative returns on the same chart
 plt.figure(figsize=(12,6))
 plt.plot(data.index, data['Cumulative_Return'], label='SMA Strategy')
 plt.plot(spy_data.index, spy_data['Cumulative_Return'], label='SPY')
@@ -45,18 +45,18 @@ plt.show()
 def check_positions(symbol):
     positions = api.list_positions()
     for position in positions:
-        if positions.symobl == symbol:
+        if positions.symbol == symbol:
             return int(positions.qty)
-        return 0
+    return 0
 
 def trade(symbol, qty):
     current_price = api.get_latest_trade(symbol).price
-    historical_data = yf.download(symbol, start=start_date, end=end_date, interval='1d')
+    historical_data = yf.download(symbol, start=start_date, end=end_date, interval='1D')
     historical_data['SMA_50'] = historical_data['Close'].rolling(window=50).mean()
     if current_price > historical_data['SMA_50'][-1]:
-        if check_positions(symbol == 0):
+        if check_positions(symbol) == 0:
                 api.submit_order(symbol=symbol, qty=qty, side='buy', type='market', time_in_force='gtc')
-                print("But order placed for", symbol)
+                print("Buy order placed for", symbol)
         else:
             print("Holding", symbol)
 
@@ -65,4 +65,4 @@ symbol = 'GOOG'
 qty = 10
 while True:
     trade(symbol, qty)
-    time.sleep(10)
+    time.sleep(60)

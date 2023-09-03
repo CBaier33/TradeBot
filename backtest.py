@@ -55,6 +55,7 @@ data['BAH_Cumulative_Return'] = (1 + data['BAH_Daily_Return']).cumprod()
 
 
 ''' PLOTTING '''
+
 # plot both cumulative returns on the same chart
 plt.figure(figsize=(12,6))
 plt.plot(data.index, data['BAH_Cumulative_Return'], label='Buy and Hold')

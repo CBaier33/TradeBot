@@ -5,64 +5,94 @@ import matplotlib.pyplot as plt
 from alpaca_trade_api import REST
 import time
 
-''' DATA '''
+class calculator():
 
-# Fetching historical stock data
-symbol = 'QQQ'
-start_date = '2022-09-01' 
-end_date = '2023-09-01'
-data = yf.download(symbol, start=start_date, end=end_date)
+    # Calculating 14 Day RSI
+    def rsi(self, data, period):
 
+        delta = data.diff().dropna()
+        gain = delta.where(delta > 0, 0)
+        loss = -delta.where(delta < 0, 0)
+        avg_gain = gain.rolling(window=period).mean()
+        avg_loss = loss.rolling(window=period).mean()
+        rs = avg_gain / avg_loss
 
-''' CALCULATIONS '''
+        return 100 - (100 / (1 + rs))
 
-# Calculating the 50-day SMA
-data['SMA_50'] = data['Close'].rolling(window=50).mean()
-
-# Calculating RSI
-def rsi(data, period):
-    delta = data.diff().dropna()
-    gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
-    avg_gain = gain.rolling(window=period).mean()
-    avg_loss = loss.rolling(window=period).mean()
-    rs = avg_gain / avg_loss
-
-    return 100 - (100 / (1 + rs))
+    # Calculating 14 Day Momentum
+    def mom(self, data, period):
+        return data-data.shift(period)*period
 
 
-''' BACKTESTING '''
+class backtester():
 
-# Backtesting RSI
-data['RSI'] = rsi(data['Close'], 14)
-data['RSI_Signal'] = 0
-data.loc[data['RSI'] < 30, 'RSI_Signal'] = 1
-data.loc[data['RSI'] > 70, 'RSI_Signal'] = -1
+    def __init__(self):
+        self.symbol = input("Please enter stock ticker: " )
+        print("\nPlease enter a backtest date range in 'year-month-day' format below...")
+        self.start_date = input("Start Date: ") 
+        self.end_date = input("End Date: ")
+        self.data = yf.download(self.symbol, start=self.start_date, end=self.end_date)
+        self.calc = calculator()
 
-data['RSI_Daily_Return'] = data['Close'].pct_change()
-data['RSI_Strategy_Return'] = data['RSI_Daily_Return'] * data['RSI_Signal'].shift(1)
-data['RSI_Cumulative_Return'] = (1 + data['RSI_Strategy_Return']).cumprod()
+    def backtest(self):
+    
+        self.data['SMA_50'] = self.data['Close'].rolling(window=50).mean()
+        self.data['MOM'] = self.calc.mom(self.data['Close'], 14)
+        self.data['RSI'] = self.calc.rsi(self.data['Close'], 14) 
+        self.data['Daily_Return'] = self.data['Close'].pct_change()
 
-# Backtesting SMA
-data['SMA_Signal'] = np.where(data['Close'] > data['SMA_50'], 1, 0)
-data['SMA_Daily_Return'] = data['Close'].pct_change()
-data['SMA_Strategy_Return'] = data['SMA_Daily_Return'] * data['SMA_Signal'].shift(1)
-data['SMA_Cumulative_Return'] = (1 + data['SMA_Strategy_Return']).cumprod()
+        # Buy and Hold 
+        self.data['BAH_Cumulative_Return'] = (1 + self.data['Daily_Return']).cumprod()
 
-# Buy and Hold Strategy
-data['BAH_Daily_Return'] = data['Close'].pct_change()
-data['BAH_Cumulative_Return'] = (1 + data['BAH_Daily_Return']).cumprod()
+        # Backtesting RSI
+        self.data['RSI_Signal'] = 0
+        self.data.loc[self.data['RSI'] < 30, 'RSI_Signal'] = 1
+        self.data.loc[self.data['RSI'] > 70, 'RSI_Signal'] = -1
+
+        self.data['RSI_Strategy_Return'] = self.data['Daily_Return'] * self.data['RSI_Signal'].shift(1)
+        self.data['RSI_Cumulative_Return'] = (1 + self.data['RSI_Strategy_Return']).cumprod()
 
 
-''' PLOTTING '''
+        # Backtesting SMA
+        self.data['SMA_Signal'] = 0
+        self.data.loc[self.data['Close'] > self.data['SMA_50'], 'SMA_Signal'] = 1
+        self.data.loc[self.data['SMA_50'] - self.data['Close'] < (self.data['SMA_50'] * .08),  'SMA_Signal'] = -1
 
-# plot both cumulative returns on the same chart
-plt.figure(figsize=(12,6))
-plt.plot(data.index, data['BAH_Cumulative_Return'], label='Buy and Hold')
-plt.plot(data.index, data['SMA_Cumulative_Return'], label='SMA Strategy')
-plt.plot(data.index, data['RSI_Cumulative_Return'], label='RSI Strategy')
-plt.xlabel('Date')
-plt.ylabel('Cumulative Return')
-plt.legend() 
-plt.show()
+        self.data['SMA_Strategy_Return'] = self.data['Daily_Return'] * self.data['SMA_Signal'].shift(1)
+        self.data['SMA_Cumulative_Return'] = (1 + self.data['SMA_Strategy_Return']).cumprod()
+
+
+        # Backtesting Momentum
+        self.data['MOM_Signal'] = 0 
+        self.data.loc[self.data['MOM'] > 100, 'MOM_Signal'] = 1
+        self.data.loc[self.data['MOM'] < -100, 'MOM_Signal'] = -1
+
+        self.data['MOM_Strategy_Return'] = self.data['Daily_Return'] * self.data['MOM_Signal'].shift(1)
+        self.data['MOM_Cumulative_Return'] = (1 + self.data['MOM_Strategy_Return']).cumprod()
+
+    def plot(self):
+        plt.figure(figsize=(12,6))
+        plt.plot(self.data.index, self.data['BAH_Cumulative_Return'], label='Buy and Hold')
+        plt.plot(self.data.index, self.data['SMA_Cumulative_Return'], label='SMA')
+        plt.plot(self.data.index, self.data['RSI_Cumulative_Return'], label='RSI')
+        plt.plot(self.data.index, self.data['MOM_Cumulative_Return'], label='Momentum')
+        plt.xlabel(self.symbol)
+        plt.ylabel('Cumulative Returns')
+        plt.legend() 
+        plt.show()
+
+if __name__ == '__main__':
+
+    while True: 
+
+        bt = backtester()
+        bt.backtest()
+        bt.plot()
+
+        restart = input('Would you like to backtest another stock? (Y/n) ')
+
+        if restart == 'n':
+            break
+        else:
+            continue
 

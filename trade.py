@@ -3,66 +3,101 @@ import pandas as pd
 import yfinance as yf
 import matplotlib.pyplot as plt
 from alpaca_trade_api import REST
+from config import api_key, api_secret, base_url
+import backtest as bb
 import time
 
-api_key = 'PKOK81QGPPHPOUS8FNFP'
-api_secret = 't1wQoMGlLOb4YsecfkBBLXG2YVOXE2vl9BAfg3Pz'
-base_url = 'https://paper-api.alpaca.markets'
 api = REST(api_key, api_secret, base_url)
 
+# Fetching historical stock data
+#symbol = 'GOOG'
+#start_date = '2015-01-01' 
+#end_date = '2022-12-31'
+#qty = 10
 
-# Fetching historical data
-symbol = 'GOOG'
-start_date = '2015-01-01' 
-end_date = '2022-12-31'
-data = yf.download(symbol, start=start_date, end=end_date)
 
-# Calculating the 50-day SMA
-data['SMA_50'] = data['Close'].rolling(window=50).mean()
+class trader():
 
-# Implementing the trading strategy
-data['Signal'] = np.where(data['Close'] > data['SMA_50'], 1, 0)
-data['Daily_Return'] = data['Close'].pct_change()
-data['Strategy_Return'] = data['Daily_Return'] * data['Signal'].shift(1)
-data['Cumulative_Return'] = (1 + data['Strategy_Return']).cumprod()
+    def __init__(self):
 
-# Fetch historical data for SPY
-spy_data = yf.download('SPY', start=start_date, end=end_date)
+        self.symbol = input("Please enter stock ticker: " )
+        print("\nPlease enter a historical data range in 'year-month-day' format below...")
+        self.start_date = input("Start Date: ") 
+        self.end_date = input("End Date: ")
+        self.data = yf.download(self.symbol, start=self.start_date, end=self.end_date, interval='1d')
+        print(f'Current Price of {self.symbol}: {api.get_latest_trade(self.symbol).price}')
+        print('\nTRADE OPTIONS')
+        print('*************')
+        print('(1) SMA\n(2) RSI\n(3) Momentum')
+        self.strategy = int(input("\nWhich strategy would you like to trade with? "))
+        self.qty = input("How many shares per trade? ")
 
-# Calculate daily returns and cumulative returns for SPY
-spy_data['Daily_Return'] = spy_data['Close'].pct_change()
-spy_data['Cumulative_Return'] = (1 + spy_data['Daily_Return']).cumprod()
+    def check_positions(self, symbol):
+        positions = api.list_positions()
+        for position in positions:
+            if position.symbol == symbol:
+                return int(position.qty)
+        return 0
 
-# plot both cumulative returns on the same chart
-plt.figure(figsize=(12,6))
-plt.plot(data.index, data['Cumulative_Return'], label='SMA Strategy')
-plt.plot(spy_data.index, spy_data['Cumulative_Return'], label='SPY')
-plt.xlabel('Date')
-plt.ylabel('Cumulative_Return')
-plt.legend() 
-plt.show()
+    def sma_trade(self, symbol, qty, historical_data):
+        current_price = api.get_latest_trade(symbol).price
+        historical_data['SMA_50'] = historical_data['Close'].rolling(window=50).mean()
 
-def check_positions(symbol):
-    positions = api.list_positions()
-    for position in positions:
-        if positions.symbol == symbol:
-            return int(positions.qty)
-    return 0
+        if current_price > historical_data['SMA_50'][-1]:
+            if self.check_positions(symbol) == 0:
+                    api.submit_order(symbol=symbol, qty=qty, side='buy', type='market', time_in_force='gtc')
+                    print("Buy order placed for", symbol)
+            else:
+                print("Holding", symbol)
 
-def trade(symbol, qty):
-    current_price = api.get_latest_trade(symbol).price
-    historical_data = yf.download(symbol, start=start_date, end=end_date, interval='1D')
-    historical_data['SMA_50'] = historical_data['Close'].rolling(window=50).mean()
-    if current_price > historical_data['SMA_50'][-1]:
-        if check_positions(symbol) == 0:
-                api.submit_order(symbol=symbol, qty=qty, side='buy', type='market', time_in_force='gtc')
-                print("Buy order placed for", symbol)
-        else:
+    def rsi_trade(self, symbol, qty, data):
+        current_rsi = bb.calculator().rsi(data['Close'], 14)[-1]
+        position_qty = self.check_positions(symbol)
+        
+        if current_rsi < 30 and position_qty == 0:
+            api.submit_order( symbol=symbol, qty=qty, side='buy', type='market', time_in_force='gtc' )
+            print("Buy order placed for", symbol) 
+        elif current_rsi > 70 and position_qty > 0:
+            api.submit_order( symbol=symbol, qty=position_qty, side='sell', type='market', time_in_force='gtc' )
+            print("Sell order placed for", symbol) 
+
+        else: 
             print("Holding", symbol)
 
 
-symbol = 'GOOG' 
-qty = 10
-while True:
-    trade(symbol, qty)
-    time.sleep(60)
+    def mom_trade(self, symbol, qty, data):
+        current_mom = bb.calculator().mom(data['Close'], 14)[-1]
+        position_qty = self.check_positions(symbol)
+
+        if current_mom > 100 and position_qty == 0:
+            api.submit_order( symbol=symbol, qty=qty, side='buy', type='market', time_in_force='gtc' )
+            print("Buy order placed for", symbol) 
+        elif current_mom < -100 and position_qty > 0:
+            api.submit_order( symbol=symbol, qty=position_qty, side='sell', type='market', time_in_force='gtc' )
+            print("Sell order placed for", symbol) 
+        
+    
+    def trade(self):
+        print('\n*******************\n')
+        if self.strategy == 1:
+            while True:
+                self.sma_trade(self.symbol, self.qty, self.data)
+                time.sleep(84600)
+
+        elif self.strategy == 2:
+            while True:
+                self.rsi_trade(self.symbol, self.qty, self.data)
+                time.sleep(84600)
+
+        elif self.strategy == 3:
+            while True:
+                self.mom_trade(self.symbol, self.qty, self.data)
+                time.sleep(84600)
+
+
+
+if __name__ == '__main__':
+
+    tr = trader()
+
+    tr.trade()

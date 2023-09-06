@@ -15,8 +15,8 @@ def rsi(data, period):
 # Calculating 14 Day Momentum
 def mom(data, period):
     return data-data.shift(period)*period
-    
-# Calculating 50 SMA
+
+# Calculating 50 Day SMA
 def sma(data):
     return data.rolling(window=50).mean()
 

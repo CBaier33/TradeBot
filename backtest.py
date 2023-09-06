@@ -14,6 +14,7 @@ class backtester():
         self.start_date = input("Start Date: ") 
         self.end_date = input("End Date: ")
         self.data = yf.download(self.symbol, start=self.start_date, end=self.end_date)
+        self.spy = yf.download('SPY', start=self.start_date, end=self.end_date)
 
     def backtest(self):
     
@@ -21,9 +22,10 @@ class backtester():
         self.data['MOM'] = calc.mom(self.data['Close'], 14)
         self.data['RSI'] = calc.rsi(self.data['Close'], 14) 
         self.data['Daily_Return'] = self.data['Close'].pct_change()
+        self.spy['SPY_Daily_Return'] = self.spy['Close'].pct_change()
 
-        # Buy and Hold 
-        self.data['BAH_Cumulative_Return'] = (1 + self.data['Daily_Return']).cumprod()
+        # SPY
+        self.spy['SPY_Cumulative_Return'] = (1 + self.spy['SPY_Daily_Return']).cumprod()
 
         # Backtesting RSI
         self.data['RSI_Signal'] = 0
@@ -35,28 +37,24 @@ class backtester():
 
 
         # Backtesting SMA
-        self.data['SMA_Signal'] = 0
-        self.data.loc[self.data['Close'] > self.data['SMA_50'], 'SMA_Signal'] = 1
-        self.data.loc[self.data['SMA_50'] - self.data['Close'] < (self.data['SMA_50'] * .08),  'SMA_Signal'] = -1
-
+        self.data['SMA_Signal'] = np.where(self.data['Close'] > self.data['SMA_50'], 1, 0)
         self.data['SMA_Strategy_Return'] = self.data['Daily_Return'] * self.data['SMA_Signal'].shift(1)
         self.data['SMA_Cumulative_Return'] = (1 + self.data['SMA_Strategy_Return']).cumprod()
-
-
+        
         # Backtesting Momentum
         self.data['MOM_Signal'] = 0 
         self.data.loc[self.data['MOM'] > 100, 'MOM_Signal'] = 1
-        self.data.loc[self.data['MOM'] < -100, 'MOM_Signal'] = -1
+        self.data.loc[self.data['MOM'] < 100, 'MOM_Signal'] = -1
 
         self.data['MOM_Strategy_Return'] = self.data['Daily_Return'] * self.data['MOM_Signal'].shift(1)
         self.data['MOM_Cumulative_Return'] = (1 + self.data['MOM_Strategy_Return']).cumprod()
 
     def plot(self):
         plt.figure(figsize=(12,6))
-        plt.plot(self.data.index, self.data['BAH_Cumulative_Return'], label='Buy and Hold')
         plt.plot(self.data.index, self.data['SMA_Cumulative_Return'], label='SMA')
         plt.plot(self.data.index, self.data['RSI_Cumulative_Return'], label='RSI')
         plt.plot(self.data.index, self.data['MOM_Cumulative_Return'], label='Momentum')
+        plt.plot(self.spy.index, self.spy['SPY_Cumulative_Return'], label='SPY')
         plt.xlabel(self.symbol)
         plt.ylabel('Cumulative Returns')
         plt.legend() 

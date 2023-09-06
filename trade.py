@@ -39,7 +39,7 @@ class trader():
         if current_price > historical_data['SMA_50'][-1] and self.check_positions(symbol) == 0:
             api.submit_order(symbol=symbol, qty=qty, side='buy', type='market', time_in_force='gtc')
             print(f'**Buy order placed for {symbol}**')
-        elif current_price <= (historical_data['SMA_50'][-1] - hisorical_data['SMA_50'][-1] * .08):
+        elif current_price <= (historical_data['SMA_50'][-1] - historical_data['SMA_50'][-1] * .08):
             if self.check_positions > 0:
                 api.submit_order(symbol=symbol, qty=qty, side='sell', type='market', time_in_force='gtc')
                 print(f'**Sell order placed for {symbol}**')
@@ -73,7 +73,7 @@ class trader():
         
         else:
             print(f"**Holding {symbol}**")
-        
+    
     def trade(self):
         print('\n*********TRADE CYCLE START*********\n')
         if self.strategy == 1:
@@ -90,6 +90,7 @@ class trader():
             while True:
                 self.mom_trade(self.symbol, self.qty, self.data)
                 time.sleep(84600)
+
 
 
 if __name__ == '__main__':

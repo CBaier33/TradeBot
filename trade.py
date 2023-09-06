@@ -4,17 +4,10 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 from alpaca_trade_api import REST
 from config import api_key, api_secret, base_url
-import backtest as bb
+import calculator as calc
 import time
 
 api = REST(api_key, api_secret, base_url)
-
-# Fetching historical stock data
-#symbol = 'GOOG'
-#start_date = '2015-01-01' 
-#end_date = '2022-12-31'
-#qty = 10
-
 
 class trader():
 
@@ -32,6 +25,7 @@ class trader():
         self.strategy = int(input("\nWhich strategy would you like to trade with? "))
         self.qty = input("How many shares per trade? ")
 
+
     def check_positions(self, symbol):
         positions = api.list_positions()
         for position in positions:
@@ -41,44 +35,50 @@ class trader():
 
     def sma_trade(self, symbol, qty, historical_data):
         current_price = api.get_latest_trade(symbol).price
-        historical_data['SMA_50'] = historical_data['Close'].rolling(window=50).mean()
+        historical_data['SMA_50'] = calc.sma(historical_data['Close'])
 
-        if current_price > historical_data['SMA_50'][-1]:
-            if self.check_positions(symbol) == 0:
-                    api.submit_order(symbol=symbol, qty=qty, side='buy', type='market', time_in_force='gtc')
-                    print("Buy order placed for", symbol)
-            else:
-                print("Holding", symbol)
+        if current_price > historical_data['SMA_50'][-1] and self.check_positions(symbol) == 0:
+            api.submit_order(symbol=symbol, qty=qty, side='buy', type='market', time_in_force='gtc')
+            print(f'**Buy order placed for {symbol}**')
+        elif current_price <= (historical_data['SMA_50'][-1] - hisorical_data['SMA_50'][-1] * .08):
+            if self.check_positions > 0:
+                api.submit_order(symbol=symbol, qty=qty, side='sell', type='market', time_in_force='gtc')
+                print(f'**Sell order placed for {symbol}**')
+        else:
+            print(f'**Holding {symbol}**')
 
     def rsi_trade(self, symbol, qty, data):
-        current_rsi = bb.calculator().rsi(data['Close'], 14)[-1]
+        current_rsi = calc.rsi(data['Close'], 14)[-1]
         position_qty = self.check_positions(symbol)
         
         if current_rsi < 30 and position_qty == 0:
             api.submit_order( symbol=symbol, qty=qty, side='buy', type='market', time_in_force='gtc' )
-            print("Buy order placed for", symbol) 
+            print(f"**Buy order placed for {symbol}**") 
         elif current_rsi > 70 and position_qty > 0:
             api.submit_order( symbol=symbol, qty=position_qty, side='sell', type='market', time_in_force='gtc' )
-            print("Sell order placed for", symbol) 
+            print(f"**Sell order placed for {symbol}**") 
 
         else: 
-            print("Holding", symbol)
+            print(f"**Holding {symbol}**")
 
 
     def mom_trade(self, symbol, qty, data):
-        current_mom = bb.calculator().mom(data['Close'], 14)[-1]
+        current_mom = calc.mom(data['Close'], 14)[-1]
         position_qty = self.check_positions(symbol)
 
         if current_mom > 100 and position_qty == 0:
             api.submit_order( symbol=symbol, qty=qty, side='buy', type='market', time_in_force='gtc' )
-            print("Buy order placed for", symbol) 
+            print(f"**Buy order placed for {symbol}**") 
         elif current_mom < -100 and position_qty > 0:
             api.submit_order( symbol=symbol, qty=position_qty, side='sell', type='market', time_in_force='gtc' )
-            print("Sell order placed for", symbol) 
+            print(f"**Sell order placed for {symbol}**") 
+        
+        else:
+            print(f"**Holding {symbol}**")
         
     
     def trade(self):
-        print('\n*******************\n')
+        print('\n*********TRADE CYCLE START*********\n')
         if self.strategy == 1:
             while True:
                 self.sma_trade(self.symbol, self.qty, self.data)

@@ -3,26 +3,8 @@ import pandas as pd
 import yfinance as yf
 import matplotlib.pyplot as plt
 from alpaca_trade_api import REST
+import calculator as calc
 import time
-
-class calculator():
-
-    # Calculating 14 Day RSI
-    def rsi(self, data, period):
-
-        delta = data.diff().dropna()
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
-        avg_gain = gain.rolling(window=period).mean()
-        avg_loss = loss.rolling(window=period).mean()
-        rs = avg_gain / avg_loss
-
-        return 100 - (100 / (1 + rs))
-
-    # Calculating 14 Day Momentum
-    def mom(self, data, period):
-        return data-data.shift(period)*period
-
 
 class backtester():
 
@@ -32,13 +14,12 @@ class backtester():
         self.start_date = input("Start Date: ") 
         self.end_date = input("End Date: ")
         self.data = yf.download(self.symbol, start=self.start_date, end=self.end_date)
-        self.calc = calculator()
 
     def backtest(self):
     
-        self.data['SMA_50'] = self.data['Close'].rolling(window=50).mean()
-        self.data['MOM'] = self.calc.mom(self.data['Close'], 14)
-        self.data['RSI'] = self.calc.rsi(self.data['Close'], 14) 
+        self.data['SMA_50'] = calc.sma(self.data['Close'])
+        self.data['MOM'] = calc.mom(self.data['Close'], 14)
+        self.data['RSI'] = calc.rsi(self.data['Close'], 14) 
         self.data['Daily_Return'] = self.data['Close'].pct_change()
 
         # Buy and Hold 

@@ -1,4 +1,4 @@
-#TradeBot
+# TradeBot #
 
 A basic bot for algo trading using the Alpaca API.
 

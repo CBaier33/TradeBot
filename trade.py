@@ -25,7 +25,6 @@ class trader():
         self.strategy = int(input("\nWhich strategy would you like to trade with? "))
         self.qty = input("How many shares per trade? ")
 
-
     def check_positions(self, symbol):
         positions = api.list_positions()
         for position in positions:
@@ -61,7 +60,6 @@ class trader():
         else: 
             print(f"**Holding {symbol}**")
 
-
     def mom_trade(self, symbol, qty, data):
         current_mom = calc.mom(data['Close'], 14)[-1]
         position_qty = self.check_positions(symbol)
@@ -76,7 +74,6 @@ class trader():
         else:
             print(f"**Holding {symbol}**")
         
-    
     def trade(self):
         print('\n*********TRADE CYCLE START*********\n')
         if self.strategy == 1:
@@ -93,7 +90,6 @@ class trader():
             while True:
                 self.mom_trade(self.symbol, self.qty, self.data)
                 time.sleep(84600)
-
 
 
 if __name__ == '__main__':
